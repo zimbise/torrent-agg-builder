@@ -9,8 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -35,19 +36,19 @@ jobs:
       - name: Inject local.properties
         run: echo "sdk.dir=$ANDROID_HOME" > local.properties
 
-      - name: Build Debug APK (assembleDebug)
+      - name: Build Debug APK
         run: ./gradlew clean assembleDebug --stacktrace --no-daemon
 
       - name: Upload Debug APK
         if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: app-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload build reports (always)
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: build-reports
           path: |
@@ -55,3 +56,16 @@ jobs:
             app/build/outputs/logs
             **/reports
           if-no-files-found: warn
+
+      - name: Surface compiler errors in logs
+        if: failure()
+        run: |
+          echo "==== Searching for compilation errors ===="
+          find . -type f -path "*/reports/*" -name "*.html" -o -name "*.txt" -o -name "*.log" | while read f; do
+            echo "--- $f ---"
+            sed -n '1,200p' "$f" | head -n 200
+          done
+          if [ -f app/build/outputs/logs/manifest-merger-debug-report.txt ]; then
+            echo "--- manifest-merger-debug-report.txt ---"
+            sed -n '1,200p' app/build/outputs/logs/manifest-merger-debug-report.txt | head -n 200
+          fi
